@@ -6,30 +6,34 @@ Fall 2026
 
 Project Development
 
-For this project, I used ChatGPT as the AI assistant and developed the harness one stage at a time instead of asking for one large final program. The prompts below are copied from the development process. For the coding stages, the AI-generated code shown is the code produced during that stage and then used as the basis for the next iteration. I compiled and tested after each major change before continuing.
+For this project, I used ChatGPT as an AI coding assistant and followed a Specification Driven Development approach. I first defined the architectural rules and technical requirements for the harness before asking the AI to generate code. I then built the project one section at a time. After each major section was generated, I added it to the version I already had in VS Code, compiled the program, tested the new feature, and then continued to the next requirement.
 
 Step 1 - Initial Specification and Architecture
 
 Prompt:
 
-I need to build Project 1 for ECE 309: a minimal LLM agent harness in standard C. I am still learning C, so keep the implementation simple and readable. Requirements: 1. Use standard C and no external libraries. 2. Create a terminal-based loop using fgets() to read user input. 3. If the user enters "exit", safely terminate the program. 4. Pass normal user input to a mock_model() function that simulates an LLM. 5. If the input contains "hello", the mock model should return a hardcoded greeting. 6. Otherwise, the mock model should return or echo a simple response. 7. Organize the code so we can later add storage for the last 5 conversation turns and a calculator/tool execution feature. 8. Use safe fixed-size character arrays and avoid unnecessary advanced C concepts. 9. Add comments explaining the important parts of the code. First, explain the architecture you recommend. Do not write the full program yet.
+I need to build a minimal LLM agent harness in standard C. Before generating the full program, help me define a simple architecture and development plan. The program must compile in a POSIX environment and should not use external libraries or real LLM APIs. It needs a terminal input loop, a mock model function, memory for the five most recent conversation turns, and a calculator tool for mathematical requests. I want to build each section separately and test each section before moving on.
 
 AI Response:
 
-The AI recommended building the program in stages: a basic terminal input/output loop, a mock_model() function, five-turn conversation history, calculator/tool execution, memory cleanup, automated testing, documentation, and final GitHub submission. The main state machine would repeatedly read input, check for exit, route tool requests to a tool, route normal requests to the mock model, print the response, save the turn, and repeat.
+The AI recommended separating the harness into a main terminal loop, a mock_model() function, conversation-history management, tool routing, a calculator tool, and memory cleanup. The main loop would repeatedly read input, check whether the user wanted to exit, determine whether the request belonged to the calculator or mock model, print the response, save the turn in history, and continue.
+
+Testing:
+
+There was no code to test yet. I used this architecture as the plan for the rest of the project and then requested each section separately.
 
 Step 2 - Basic Input Loop
 
 Prompt:
 
-Create the first stage of the program. Write a simple standard C program that uses fgets() to continuously read user input. Remove the newline from the input and terminate safely when the user enters "exit". For now, simply print the input back as a mock response.
+Create the first section of the harness in standard C. Use a while loop and fgets() to continuously read terminal input. Store the input in a character array, remove the newline added by fgets(), and safely end the program if the user types "exit". For now, just print the input back so I can verify the loop before adding other features.
 
 AI Response:
 
 #include <stdio.h>
 #include <string.h>
 
-int main() {
+int main(void) {
 char input[256];
 
 while (1) {
@@ -63,74 +67,53 @@ I ran it with:
 
 ./harness
 
-The program accepted terminal input and ended correctly when I entered exit.
+I tested normal text and the exit command. The program accepted terminal input and ended correctly when I entered exit.
 
 Step 3 - Mock Model
 
 Prompt:
 
-Move the simulated LLM behavior into a separate mock_model() function. If the user's input contains the word "hello", return a hardcoded greeting. Otherwise, echo the user's message as the simulated response. Keep the code simple and use only standard C libraries.
+Add a separate mock_model() function to the program. The main loop should pass normal user input to this function. If the input contains the word "hello", return a hardcoded greeting. Otherwise, return a simple response containing the user's original message. Store the result in a response array so it can later be saved in conversation history.
 
 AI Response:
 
-#include <stdio.h>
-#include <string.h>
+The AI changed the mock model so it filled a response buffer instead of printing directly. The generated function was:
 
-void mock_model(char input[]) {
+void mock_model(char input[], char response[]) {
 if (strstr(input, "hello") != NULL) {
-printf("Assistant: Hello! How can I help you?\n");
+strcpy(response, "Hello! How can I help you?");
 }
 else {
-printf("Assistant: You said: %s\n", input);
+snprintf(response, RESPONSE_SIZE, "You said: %s", input);
 }
 }
 
-int main() {
-char input[256];
-
-while (1) {
-    printf("You: ");
-
-    if (fgets(input, sizeof(input), stdin) == NULL) {
-        break;
-    }
-
-    input[strcspn(input, "\n")] = '\0';
-
-    if (strcmp(input, "exit") == 0) {
-        printf("Goodbye!\n");
-        break;
-    }
-
-    mock_model(input);
-}
-
-return 0;
-
-}
+The main loop was also changed so normal user input was passed to mock_model() and the returned response was printed.
 
 Testing:
 
-I tested hello, normal text, and exit. The program routed normal input through mock_model() and produced the expected hardcoded greeting for hello.
+I tested hello, normal text, and exit. The program returned the hardcoded greeting when hello was present and returned a simple simulated response for other normal input.
 
 Step 4 - Five-Turn Conversation History
 
 Prompt:
 
-Extend the program so it stores the five most recent conversation turns. Each turn should contain both the user's message and the assistant's response. Use dynamic memory safely. When more than five turns exist, free the oldest turn and remove it from the history. Add a "history" command that displays the currently stored turns. Free all remaining allocated memory before the program exits.
+Add context management to the current harness. The program needs to safely store the five most recent conversation turns. Each turn should contain both the user's message and the assistant's response. Use a struct for one turn and use dynamic memory to store copies of the strings. When a sixth turn is added, free the oldest turn, shift the remaining turns, and save the newest turn. Add a "history" command so I can verify what is stored. Free all remaining allocated memory before the program exits.
 
 AI Response:
 
-The AI introduced a Turn structure containing char *user and char *assistant, a MAX_TURNS value of 5, a copy_string() helper using malloc(), save_turn() to store turns, show_history() to display them, and free_history() to release allocated memory. When the history was full, the oldest turn was freed, the remaining turns were shifted left, and the newest turn was added.
-
-The generated Turn structure was:
+The AI introduced a Turn structure and a maximum history size of five:
 
 typedef struct {
 char *user;
 char *assistant;
 } Turn;
 
-The generated memory-copy helper was:
+#define MAX_TURNS 5
+
+It also generated a copy_string() helper using malloc(), a save_turn() function, a show_history() function, and a free_history() function.
+
+The string-copy helper was:
 
 char *copy_string(const char *source) {
 char *copy = malloc(strlen(source) + 1);
@@ -143,7 +126,7 @@ return copy;
 
 }
 
-The generated cleanup function was:
+The cleanup function was:
 
 void free_history(Turn history[], int count) {
 for (int i = 0; i < count; i++) {
@@ -152,19 +135,21 @@ free(history[i].assistant);
 }
 }
 
+When the history was already full, save_turn() freed the oldest user and assistant strings, shifted the remaining turns left, and stored the new turn at the end.
+
 Testing:
 
-I entered more than five normal messages and then entered history. The oldest message was removed and only the five most recent conversation turns were displayed.
+I entered more than five normal messages and then entered history. The program correctly removed the oldest message and displayed only the five most recent conversation turns.
 
 Step 5 - Calculator Tool
 
 Prompt:
 
-Add a calculator tool to the harness. If the user's input begins with "calc ", the harness should route the request to a calculator function instead of the mock model. Support addition, subtraction, multiplication, and division. Use a format such as "calc 10 + 5". Detect division by zero and invalid operators.
+Add tool execution to the current harness by creating a calculator_tool() function. Calculator requests should use the format "calc number operator number", such as "calc 10 + 5". Support addition, subtraction, multiplication, and division. Use sscanf() to parse the request, detect division by zero, detect unsupported operators, and store the result in the same response buffer used by the mock model. Calculator requests should go to the tool instead of mock_model().
 
 AI Response:
 
-The AI added calculator_tool(), which uses sscanf() to parse two numbers and an operator. The generated function was:
+The AI added calculator_tool(), which used sscanf() to parse two numbers and an operator. The generated function was:
 
 int calculator_tool(char input[], char response[]) {
 double num1;
@@ -204,21 +189,35 @@ return 1;
 
 }
 
-The main loop was also changed so input beginning with "calc " is sent to calculator_tool() and other normal input is sent to mock_model().
+The main loop was updated so input beginning with "calc " was routed to calculator_tool() and other normal input was routed to mock_model().
 
 Testing:
 
-I tested addition, subtraction, multiplication, division, and division by zero. For example, calc 10 + 5 returned Calculator result: 15.00 and calc 10 / 0 returned the division-by-zero error.
+I tested addition, subtraction, multiplication, division, and division by zero. For example, calc 10 + 5 returned Calculator result: 15.00 and calc 10 / 0 returned the division-by-zero error. I also checked history afterward and confirmed that calculator requests and responses were stored as conversation turns.
 
-Step 6 - Automated Bash Testing
+Step 6 - Review the Combined Harness
 
 Prompt:
 
-I have a C program called harness.c that implements a simple LLM harness. Please create a simple Bash testing script named test.sh. The script should: 1. Compile harness.c. 2. Test the hello response. 3. Test the calculator tool. 4. Test that conversation history keeps only the last 5 turns. 5. Test that the exit command ends the program. 6. Print PASS or FAIL for each test. 7. Keep the script simple enough for a beginner to understand.
+Review the current harness architecture. The program now has a terminal input loop, an exit command, mock_model(), five-turn conversation history, dynamic memory allocation, a calculator tool, tool routing, and memory cleanup. Tell me what I should manually test before creating the automated test script.
 
 AI Response:
 
-The AI generated test.sh to compile harness.c and pipe predefined input into the program. It used grep to check expected output and printed PASS or FAIL for each case. Tests were created for the hello response, calculator, division by zero, five-turn history, and exit behavior.
+The AI recommended testing normal input, the hello response, calculator input, division by zero, history with fewer than five turns, history with more than five turns, exit behavior, and memory cleanup.
+
+Testing:
+
+I manually tested each of those paths before moving on to automated testing. The individual sections worked together correctly in the combined harness.
+
+Step 7 - Automated Bash Testing
+
+Prompt:
+
+Create a simple Bash testing script named test.sh for my C harness. The script should compile harness.c, test the hello response, test the calculator tool, test division by zero, send more than five conversation turns and verify that only the newest five remain, test the exit command, and print PASS or FAIL for each test. Keep the script simple enough for me to understand.
+
+AI Response:
+
+The AI generated test.sh to compile harness.c and pipe predefined input into the program using printf. It used grep to check the output and printed PASS or FAIL for each test. The script included tests for compilation, hello, calculator functionality, division by zero, five-turn history, and exit behavior.
 
 Testing:
 
@@ -235,39 +234,35 @@ PASS: Division by zero test
 PASS: History keeps last 5 turns
 PASS: Exit test
 
-Step 7 - Manual Memory Leak Testing
+Step 8 - Memory Leak Testing
 
 Prompt:
 
-How can I perform a basic memory leak test on this C program on macOS?
+My conversation history uses malloc() and free(). I am using macOS. Show me a simple way to check the compiled program for basic memory leaks.
 
 AI Response:
 
-The AI recommended using the macOS leaks tool. The command used was:
+The AI recommended using the macOS leaks utility with this command:
 
 printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness
 
 Testing:
 
-The leaks report showed:
+I ran the command and the leaks report showed:
 
 0 leaks for 0 total leaked bytes
 
-Step 8 - Add Memory Leak Testing to test.sh
+This confirmed that the dynamically allocated conversation memory was being released during the test.
+
+Step 9 - Add Memory Testing to test.sh
 
 Prompt:
 
-How do I add the memory leak test to the automated test.sh script so the script itself checks for basic memory leaks?
+Add a basic memory-leak check to test.sh so the automated script also checks memory management. If the macOS leaks tool is available, use it. If leaks is not available but valgrind is available, use valgrind. Print PASS when no leaks are detected and keep this as a separate test.
 
 AI Response:
 
 The AI generated this additional test:
-
--------------------------
-
-Test 6: Memory leaks
-
--------------------------
 
 if command -v leaks >/dev/null 2>&1; then
 output=$(printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness 2>&1)
@@ -295,18 +290,32 @@ fi
 
 Testing:
 
-On my Mac, the final test script produced PASS for the memory leak test in addition to the functional tests.
+I added this section to the existing test.sh file and ran the script again. On my Mac, the final test script produced:
 
-Step 9 - Final Cleanup
+PASS: Program compiled.
+PASS: Hello test
+PASS: Calculator test
+PASS: Division by zero test
+PASS: History keeps last 5 turns
+PASS: Exit test
+PASS: Memory leak test
+
+Testing complete.
+
+Step 10 - Final Cleanup
 
 Prompt:
 
-Check all files to make sure I completed the assignment correctly and identify anything that should be fixed before submission.
+Review the final project files and check whether the implementation matches the project requirements for standard C, POSIX compilation, the terminal core loop, mock model, five-turn context management, safe dynamic memory handling, tool execution, automated testing, memory-leak testing, README documentation, and the vibe coding log. Identify anything that should be cleaned up before submission.
 
 AI Response:
 
-The AI reviewed harness.c, test.sh, README.md, vibe_coding_log.md, and github.txt against the project specification. It recommended changing main() to main(void), ensuring a final newline in harness.c, updating README.md to mention the automated memory leak test, keeping the exact development prompts/code in the vibe coding log, and excluding the compiled harness executable and .vscode folder from the repository.
+The AI reviewed the final project and confirmed that the main implementation requirements were present. It recommended using main(void), making sure harness.c ended with a newline, updating README.md so it matched the final memory test, and keeping unnecessary generated files such as the compiled harness executable and .vscode folder out of the repository.
+
+Testing:
+
+I made the final cleanup changes and ran bash test.sh again. All functional tests and the memory-leak test passed.
 
 Final Result
 
-The completed project includes a standard C terminal harness, a mock model, five-turn conversation context, calculator tool execution, dynamic memory allocation and cleanup, automated functional testing, automated memory-leak checking, a README, a vibe-coding development log, and a GitHub submission link. The project was built and tested incrementally so each requirement could be verified before moving to the next stage.
+The completed project includes a standard C terminal harness, a mock model, five-turn conversation context, calculator tool execution, dynamic memory allocation and cleanup, automated functional testing, automated memory-leak checking, a README, a vibe-coding development log, and a GitHub submission link. I followed the SDD process by defining the architectural requirements first, requesting each major section separately, integrating each section with the existing code, and verifying the program after each major change.
