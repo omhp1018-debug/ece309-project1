@@ -1,111 +1,118 @@
 #!/bin/bash
 
-echo "Compiling harness..."
-
+# Compile harness.c
 gcc harness.c -o harness
 
 if [ $? -ne 0 ]; then
-    echo "FAIL: Program did not compile."
+    echo "FAIL: Compile"
     exit 1
+else
+    echo "PASS: Compile"
 fi
 
-echo "PASS: Program compiled."
-echo
 
-
-# -------------------------
-# Test 1: Hello response
-# -------------------------
-
+# Test 1: hello response
 output=$(printf "hello\nexit\n" | ./harness)
 
-if echo "$output" | grep -q "Hello! How can I help you?"; then
-    echo "PASS: Hello test"
+if echo "$output" | grep -q "Hello! Nice to meet you!"; then
+    echo "PASS: Hello response"
 else
-    echo "FAIL: Hello test"
+    echo "FAIL: Hello response"
 fi
 
 
-# -------------------------
-# Test 2: Calculator
-# -------------------------
-
+# Test 2: calculator
 output=$(printf "calc 10 + 5\nexit\n" | ./harness)
 
-if echo "$output" | grep -q "Calculator result: 15.00"; then
-    echo "PASS: Calculator test"
+if echo "$output" | grep -q "Assistant: 15"; then
+    echo "PASS: Calculator"
 else
-    echo "FAIL: Calculator test"
+    echo "FAIL: Calculator"
 fi
 
 
-# -------------------------
-# Test 3: Division by zero
-# -------------------------
-
+# Test 3: division by zero
 output=$(printf "calc 10 / 0\nexit\n" | ./harness)
 
-if echo "$output" | grep -q "Cannot divide by zero"; then
-    echo "PASS: Division by zero test"
+if echo "$output" | grep -q "Error: cannot divide by zero."; then
+    echo "PASS: Division by zero"
 else
-    echo "FAIL: Division by zero test"
+    echo "FAIL: Division by zero"
 fi
 
 
-# -------------------------
-# Test 4: History limit
-# -------------------------
+# Test 4: history keeps only the newest 5 turns
+output=$(printf "message1\nmessage2\nmessage3\nmessage4\nmessage5\nmessage6\nhistory\nexit\n" | ./harness)
 
-output=$(printf "one\ntwo\nthree\nfour\nfive\nsix\nhistory\nexit\n" | ./harness)
+# Only look at the section printed by the history command.
+history_output=$(echo "$output" | sed -n '/Conversation History:/,$p')
 
-if echo "$output" | grep -q "You: six" &&
-   ! echo "$output" | grep -A20 "Conversation History" | grep -q "You: one"; then
+history_pass=true
 
-    echo "PASS: History keeps last 5 turns"
+# message1 should have been removed.
+if echo "$history_output" | grep -q "You: message1"; then
+    history_pass=false
+fi
+
+# message2 through message6 should still be stored.
+for n in 2 3 4 5 6
+do
+    if ! echo "$history_output" | grep -q "You: message$n"; then
+        history_pass=false
+    fi
+done
+
+if [ "$history_pass" = true ]; then
+    echo "PASS: 5-turn history"
 else
-    echo "FAIL: History test"
+    echo "FAIL: 5-turn history"
 fi
 
 
-# -------------------------
-# Test 5: Exit command
-# -------------------------
-
+# Test 5: exit command
 output=$(printf "exit\n" | ./harness)
 
 if echo "$output" | grep -q "Goodbye!"; then
-    echo "PASS: Exit test"
+    echo "PASS: Exit command"
 else
-    echo "FAIL: Exit test"
+    echo "FAIL: Exit command"
 fi
 
-# -------------------------
-# Test 6: Memory leaks
-# -------------------------
+
+# Test 6: basic memory leak check
+# Use 6 messages so the oldest history entry must be freed.
+memory_input="one
+two
+three
+four
+five
+six
+exit
+"
 
 if command -v leaks >/dev/null 2>&1; then
-    output=$(printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness 2>&1)
+
+    output=$(printf "%s" "$memory_input" | leaks --atExit -- ./harness 2>&1)
 
     if echo "$output" | grep -q "0 leaks for 0 total leaked bytes"; then
-        echo "PASS: Memory leak test"
+        echo "PASS: Memory leaks"
     else
-        echo "FAIL: Memory leak test"
+        echo "FAIL: Memory leaks"
     fi
 
 elif command -v valgrind >/dev/null 2>&1; then
-    output=$(printf "hello\ncalc 5 + 5\nexit\n" | valgrind --leak-check=full ./harness 2>&1)
 
-    if echo "$output" | grep -q "no leaks are possible"; then
-        echo "PASS: Memory leak test"
-    elif echo "$output" | grep -q "All heap blocks were freed"; then
-        echo "PASS: Memory leak test"
+    output=$(printf "%s" "$memory_input" | valgrind --leak-check=full ./harness 2>&1)
+
+    if echo "$output" | grep -q "definitely lost: 0 bytes"; then
+        echo "PASS: Memory leaks"
     else
-        echo "FAIL: Memory leak test"
+        echo "FAIL: Memory leaks"
     fi
 
 else
-    echo "SKIP: No memory leak checker installed"
+    echo "SKIP: Memory leaks (leaks/valgrind not installed)"
 fi
 
-echo
+
 echo "Testing complete."

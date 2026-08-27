@@ -1,207 +1,229 @@
 // Om Panchal | harness.c | ECE309F26
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 
-#define MAX_TURNS 5
-#define INPUT_SIZE 256
-#define RESPONSE_SIZE 512
+#define MAX_HISTORY 5
 
-typedef struct {
-    char *user;
-    char *assistant;
-} Turn;
+// One conversation turn contains a user message
+// and an assistant response.
+struct ConversationTurn {
+    char *user_message;
+    char *assistant_response;
+};
 
-
-// Creates a copy of a string using dynamically allocated memory.
-char *copy_string(const char *source) {
-    char *copy = malloc(strlen(source) + 1);
-
-    if (copy != NULL) {
-        strcpy(copy, source);
-    }
-
-    return copy;
-}
-
-
-// Simulates a simple LLM.
+// Handles normal conversation.
 void mock_model(char input[], char response[]) {
+
+    // If the input contains "hello", return a greeting.
     if (strstr(input, "hello") != NULL) {
-        strcpy(response, "Hello! How can I help you?");
+        strcpy(response, "Hello! Nice to meet you!");
     }
+
+    // Otherwise, echo the user's input.
     else {
-        snprintf(response, RESPONSE_SIZE, "You said: %s", input);
+        strcpy(response, input);
     }
 }
 
+// Handles calculator requests.
+void calculator(char input[], char response[]) {
 
-// Calculator tool.
-int calculator_tool(char input[], char response[]) {
-    double num1;
-    double num2;
-    char operation;
+    double number1;
+    double number2;
+    char operator;
 
-    // Read input in the form:
-    // calc 5 + 3
-    if (sscanf(input, "calc %lf %c %lf",
-               &num1, &operation, &num2) != 3) {
-        return 0;
+    // Read two numbers and an operator from the input.
+    // input + 5 skips over the word "calc ".
+    if (sscanf(input + 5, "%lf %c %lf",
+               &number1, &operator, &number2) != 3) {
+
+        strcpy(response, "Invalid calculator expression.");
+        return;
     }
 
-    double result;
-
-    switch (operation) {
-
-        case '+':
-            result = num1 + num2;
-            break;
-
-        case '-':
-            result = num1 - num2;
-            break;
-
-        case '*':
-            result = num1 * num2;
-            break;
-
-        case '/':
-            if (num2 == 0) {
-                strcpy(response, "Error: Cannot divide by zero.");
-                return 1;
-            }
-
-            result = num1 / num2;
-            break;
-
-        default:
-            strcpy(response, "Error: Unsupported operator.");
-            return 1;
+    // Addition.
+    if (operator == '+') {
+        sprintf(response, "%g", number1 + number2);
     }
 
-    snprintf(response, RESPONSE_SIZE,
-             "Calculator result: %.2f", result);
+    // Subtraction.
+    else if (operator == '-') {
+        sprintf(response, "%g", number1 - number2);
+    }
 
-    return 1;
+    // Multiplication.
+    else if (operator == '*') {
+        sprintf(response, "%g", number1 * number2);
+    }
+
+    // Division.
+    else if (operator == '/') {
+
+        // Make sure we do not divide by zero.
+        if (number2 == 0) {
+            strcpy(response, "Error: cannot divide by zero.");
+        }
+
+        else {
+            sprintf(response, "%g", number1 / number2);
+        }
+    }
+
+    // Handle an unsupported operator.
+    else {
+        strcpy(response, "Invalid operator.");
+    }
 }
 
+// Prints the stored conversation history.
+void print_history(struct ConversationTurn history[],
+                   int history_count) {
 
-// Saves one conversation turn.
-void save_turn(Turn history[], int *count,
-               char user_text[], char assistant_text[]) {
+    int i;
 
-    char *user_copy = copy_string(user_text);
-    char *assistant_copy = copy_string(assistant_text);
+    if (history_count == 0) {
+        printf("No conversation history yet.\n");
+        return;
+    }
 
-    if (user_copy == NULL || assistant_copy == NULL) {
-        free(user_copy);
-        free(assistant_copy);
+    printf("\nConversation History:\n");
+
+    for (i = 0; i < history_count; i++) {
+
+        printf("\nTurn %d\n", i + 1);
+        printf("You: %s\n", history[i].user_message);
+        printf("Assistant: %s\n",
+               history[i].assistant_response);
+    }
+
+    printf("\n");
+}
+
+// Adds one turn to conversation history.
+void add_to_history(struct ConversationTurn history[],
+                    int *history_count,
+                    char user_message[],
+                    char assistant_response[]) {
+
+    int i;
+
+    char *new_user_message;
+    char *new_assistant_response;
+
+    // If 5 turns are already stored,
+    // remove the oldest turn first.
+    if (*history_count == MAX_HISTORY) {
+
+        free(history[0].user_message);
+        free(history[0].assistant_response);
+
+        // Shift the remaining turns to the left.
+        for (i = 0; i < MAX_HISTORY - 1; i++) {
+            history[i] = history[i + 1];
+        }
+
+        *history_count = MAX_HISTORY - 1;
+    }
+
+    // Allocate memory for the new messages.
+    new_user_message = malloc(strlen(user_message) + 1);
+
+    new_assistant_response =
+        malloc(strlen(assistant_response) + 1);
+
+    // Check if malloc failed.
+    if (new_user_message == NULL ||
+        new_assistant_response == NULL) {
+
+        free(new_user_message);
+        free(new_assistant_response);
 
         printf("Memory allocation failed.\n");
         return;
     }
 
-    // Remove oldest turn if history is full.
-    if (*count == MAX_TURNS) {
+    // Copy the messages into the new memory.
+    strcpy(new_user_message, user_message);
+    strcpy(new_assistant_response, assistant_response);
 
-        free(history[0].user);
-        free(history[0].assistant);
+    // Store the pointers in history.
+    history[*history_count].user_message =
+        new_user_message;
 
-        for (int i = 1; i < MAX_TURNS; i++) {
-            history[i - 1] = history[i];
-        }
+    history[*history_count].assistant_response =
+        new_assistant_response;
 
-        *count = MAX_TURNS - 1;
-    }
-
-    history[*count].user = user_copy;
-    history[*count].assistant = assistant_copy;
-
-    (*count)++;
+    (*history_count)++;
 }
 
+int main() {
 
-// Displays conversation history.
-void show_history(Turn history[], int count) {
+    char input[256];
+    char response[256];
 
-    printf("\n--- Conversation History ---\n");
+    struct ConversationTurn history[MAX_HISTORY];
 
-    if (count == 0) {
-        printf("No conversation history.\n");
-    }
-
-    for (int i = 0; i < count; i++) {
-        printf("You: %s\n", history[i].user);
-        printf("Assistant: %s\n", history[i].assistant);
-    }
-
-    printf("----------------------------\n\n");
-}
-
-
-// Frees all allocated memory.
-void free_history(Turn history[], int count) {
-
-    for (int i = 0; i < count; i++) {
-        free(history[i].user);
-        free(history[i].assistant);
-    }
-}
-
-
-int main(void) {
-
-    char input[INPUT_SIZE];
-    char response[RESPONSE_SIZE];
-
-    Turn history[MAX_TURNS] = {0};
     int history_count = 0;
+    int i;
 
     while (1) {
 
         printf("You: ");
 
+        // Read user input.
         if (fgets(input, sizeof(input), stdin) == NULL) {
             break;
         }
 
-        // Remove newline.
+        // Remove the newline from fgets().
         input[strcspn(input, "\n")] = '\0';
 
         // Exit command.
         if (strcmp(input, "exit") == 0) {
-            printf("Goodbye!\n");
             break;
         }
 
         // History command.
+        // This command is not saved in conversation history.
         if (strcmp(input, "history") == 0) {
-            show_history(history, history_count);
+
+            print_history(history, history_count);
             continue;
         }
 
-        // Check whether the calculator tool should handle input.
+        // Check if the input starts with "calc ".
         if (strncmp(input, "calc ", 5) == 0) {
 
-            if (!calculator_tool(input, response)) {
-                strcpy(response,
-                       "Invalid calculator format. Example: calc 5 + 3");
-            }
+            // Send calculator requests to calculator().
+            calculator(input, response);
         }
 
-        // Otherwise send input to mock model.
         else {
+
+            // Send normal messages to mock_model().
             mock_model(input, response);
         }
 
+        // Print whichever response was created.
         printf("Assistant: %s\n", response);
 
-        // Save turn in context history.
-        save_turn(history, &history_count, input, response);
+        // Save the user message and response.
+        add_to_history(history,
+                       &history_count,
+                       input,
+                       response);
     }
 
-    free_history(history, history_count);
+    // Free all remaining conversation memory.
+    for (i = 0; i < history_count; i++) {
+
+        free(history[i].user_message);
+        free(history[i].assistant_response);
+    }
+
+    printf("Goodbye!\n");
 
     return 0;
 }

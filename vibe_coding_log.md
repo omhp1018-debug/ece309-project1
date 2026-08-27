@@ -4,386 +4,982 @@ Om Panchal
 ECE 309
 Fall 2026
 
-Project Development
+Project
+ECE 309 Project 1: An LLM Mini-Harness in C via Vibe Coding
 
-For this project, I used ChatGPT as an AI coding assistant and followed a Specification Driven Development approach. I first defined the architectural rules and technical requirements for the harness before asking the AI to generate code. I then built the project one section at a time. After each major section was generated, I added it to the version I already had in VS Code, compiled the program, tested the new feature, and then continued to the next requirement.
+AI Assistant
+ChatGPT
 
-Architectural Rules
+Purpose of This Log
+This file documents the prompts, iterations, AI responses, debugging steps, and testing workflow used to create harness.c and test.sh.
 
-The program must be written in standard C and compile with gcc in a POSIX environment.
+The overall architectural rules used during development were:
 
-The program must use a terminal-based loop and fgets() for user input.
+Use standard C only.
 
-Typing "exit" must safely stop the program.
+Keep the program beginner-friendly.
 
-Normal input must be passed to a mock_model() function that simulates an LLM without using a real LLM API.
+Use an infinite input loop with fgets().
 
-The harness must store the five most recent conversation turns.
+Use exit to safely terminate the program.
 
-Each conversation turn must contain both the user message and assistant response.
+Send normal user input to a separate mock_model() function.
 
-Conversation memory must be allocated and freed safely.
+Store only the most recent 5 conversation turns.
 
-Calculator requests must be routed to a separate tool instead of the mock model.
+Use dynamic memory with malloc() and free().
 
-The calculator tool must support basic mathematical operations and division-by-zero handling.
+Provide a history command that does not save itself.
 
-A separate Bash testing script must verify state management and basic memory leaks.
+Route calc requests to a calculator tool instead of mock_model().
 
-State Machine
+Support +, -, *, and /.
 
-Start program
-Initialize conversation history
-Read user input with fgets()
-If input is "exit", stop the loop
-If input is "history", display stored conversation history
-If input begins with "calc ", send it to calculator_tool()
-Otherwise, send input to mock_model()
-Print the response
-Save the user message and assistant response
-If more than five turns are stored, remove the oldest turn
-Repeat
-Free remaining allocated memory
-End program
+Handle division by zero.
 
-Step 1 - Initial Specification and Architecture
+Create a separate Bash test script.
 
-Prompt:
+Automatically test state management and basic memory leaks.
 
-I need to build a minimal LLM agent harness in standard C. Before generating the full program, help me define a simple architecture and development plan. The program must compile in a POSIX environment and should not use external libraries or real LLM APIs. It needs a terminal input loop, a mock model function, memory for the five most recent conversation turns, and a calculator tool for mathematical requests. I want to build each section separately and test each section before moving on.
+Interaction 1 - Initial Specification / Core Loop
 
-AI Response:
+User Prompt
 
-The AI recommended separating the harness into a main terminal loop, a mock_model() function, conversation-history management, tool routing, a calculator tool, and memory cleanup. The main loop would repeatedly read input, check whether the user wanted to exit, determine whether the request belonged to the calculator or mock model, print the response, save the turn in history, and continue.
+I need to write a simple command-line program in C. I am a beginner, so please keep the
+code as simple as possible. Do not use external libraries, only standard ones like <stdio.h>
+and <string.h>. Here is the specification for the program:
 
-Testing:
+It should run an infinite while loop that asks for user input using fgets.
 
-There was no code to test yet. I used this architecture as the plan for the rest of the project and then requested each section separately.
+If the user types 'exit', the loop should break and the program should end.
 
-Step 2 - Basic Input Loop
+If the user types a sentence containing the word 'hello', the program should print a
+hardcoded greeting.
 
-Prompt:
+If the user types anything else, it should echo their input back to them.
 
-Create the first section of the harness in standard C. Use a while loop and fgets() to continuously read terminal input. Store the input in a character array, remove the newline added by fgets(), and safely end the program if the user types "exit". For now, just print the input back so I can verify the loop before adding other features.
+Please add clear, line-by-line comments explaining what the code is doing.
 
-AI Response:
+AI Response
+
+Here is a simple beginner-friendly version using only <stdio.h> and <string.h>:
+
+#include <stdio.h>      // Allows us to use printf() and fgets()
+#include <string.h>     // Allows us to use strcmp(), strstr(), and strcspn()
+
+int main() {
+
+// Create an array to store the user's input.
+char input[256];
+
+// Keep running the program until the user types "exit".
+while (1) {
+
+    // Ask the user to enter something.
+    printf("Enter something: ");
+
+    // Read a line of input from the user.
+    fgets(input, sizeof(input), stdin);
+
+    // Remove the newline character that fgets() adds.
+    input[strcspn(input, "\n")] = '\0';
+
+    // Check if the user typed exactly "exit".
+    if (strcmp(input, "exit") == 0) {
+
+        // Leave the while loop.
+        break;
+    }
+
+    // Check if the user's input contains the word "hello".
+    else if (strstr(input, "hello") != NULL) {
+
+        // Print a hardcoded greeting.
+        printf("Hello! Nice to meet you!\n");
+    }
+
+    // If the input was not "exit" and did not contain "hello".
+    else {
+
+        // Print the user's input back to them.
+        printf("You said: %s\n", input);
+    }
+}
+
+// Print a message before the program ends.
+printf("Goodbye!\n");
+
+// End the program successfully.
+return 0;
+
+}
+
+Example:
+
+Enter something: how are you?
+You said: how are you?
+
+Enter something: hello there
+Hello! Nice to meet you!
+
+Enter something: exit
+Goodbye!
+
+This version treats hello as case-sensitive, so hello works but Hello does not.
+
+Development Result
+
+The first version established the basic fgets() loop, exit command, hello behavior, and echo behavior.
+
+Interaction 2 - Moving Model Behavior Into mock_model()
+
+User Prompt
+
+Now can you change the program so the hello and echo behavior are inside a separate mock_model() function? I want the main loop to send normal user input to that function and then print the response. Keep the code simple and explain what you changed.
+
+AI Response
+
+Sure. The main change is that main() now only handles getting input, checking for "exit", and printing the response. The "hello" check and echo behavior are moved into a separate mock_model() function.
+
+#include <stdio.h>      // Allows us to use printf() and fgets()
+#include <string.h>     // Allows us to use strcmp(), strstr(), strcpy(), and strcspn()
+
+// This function decides what response to give based on the user's input.
+void mock_model(char input[], char response[]) {
+
+// Check if the input contains the word "hello".
+if (strstr(input, "hello") != NULL) {
+
+    // Store a hardcoded greeting in the response array.
+    strcpy(response, "Hello! Nice to meet you!");
+}
+
+// If the input does not contain "hello".
+else {
+
+    // Copy the user's input into the response array.
+    strcpy(response, input);
+}
+
+}
+
+int main() {
+
+// Store the user's input.
+char input[256];
+
+// Store the response from mock_model().
+char response[256];
+
+// Keep running until the user types "exit".
+while (1) {
+
+    // Ask the user for input.
+    printf("Enter something: ");
+
+    // Read the user's input.
+    fgets(input, sizeof(input), stdin);
+
+    // Remove the newline character added by fgets().
+    input[strcspn(input, "\n")] = '\0';
+
+    // Check if the user typed exactly "exit".
+    if (strcmp(input, "exit") == 0) {
+
+        // Leave the loop.
+        break;
+    }
+
+    // Send normal user input to mock_model().
+    mock_model(input, response);
+
+    // Print the response returned by mock_model().
+    printf("%s\n", response);
+}
+
+// Print a message before ending the program.
+printf("Goodbye!\n");
+
+// End the program successfully.
+return 0;
+
+}
+
+What changed
+
+Previously, main() handled all three behaviors: checking for "exit", checking for "hello", and echoing input.
+
+Now the responsibilities are split:
+
+main() gets input and handles "exit".
+
+mock_model() checks for "hello" and creates the response.
+
+main() prints whatever mock_model() puts into response.
+
+For example:
+
+Enter something: hello there
+Hello! Nice to meet you!
+
+Enter something: how are you?
+how are you?
+
+Enter something: exit
+Goodbye!
+
+The important new line is:
+
+mock_model(input, response);
+
+You can think of it as: send input to the mock model, and let it fill in response.
+
+Development Result
+
+The mock model logic was separated from the main loop so normal messages could be routed through a model-like function.
+
+Interaction 3 - Adding Five-Turn Conversation History
+
+User Prompt
+
+Now I need to add conversation history. Can you make the program store the last 5 conversation turns, where each turn has both the user message and the assistant response? Use a struct and dynamic memory with malloc and free, but keep it beginner friendly and explain what each new part does.
+
+AI Response
+
+Yes. A simple beginner-friendly way is to make a ConversationTurn struct containing two dynamically allocated strings: one for the user message and one for the assistant response.
+
+When there are already 5 turns, the program frees the oldest turn, shifts the other four forward, and stores the newest turn at the end.
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>     // Allows us to use malloc() and free()
 
-int main(void) {
+// The maximum number of conversation turns we want to remember.
+#define MAX_HISTORY 5
+
+// A struct groups the user message and assistant response together.
+struct ConversationTurn {
+char *user_message;
+char *assistant_response;
+};
+
+// This function creates the assistant's response.
+void mock_model(char input[], char response[]) {
+
+// If the input contains "hello", return a greeting.
+if (strstr(input, "hello") != NULL) {
+    strcpy(response, "Hello! Nice to meet you!");
+}
+
+// Otherwise, echo the user's input.
+else {
+    strcpy(response, input);
+}
+
+}
+
+// This function saves one conversation turn into history.
+void add_to_history(struct ConversationTurn history[],
+int *history_count,
+char user_message[],
+char assistant_response[]) {
+
+int i;
+
+// If we already have 5 turns, remove the oldest one.
+if (*history_count == MAX_HISTORY) {
+
+    // Free the memory used by the oldest user message.
+    free(history[0].user_message);
+
+    // Free the memory used by the oldest assistant response.
+    free(history[0].assistant_response);
+
+    // Move turns 1-4 one position to the left.
+    for (i = 0; i < MAX_HISTORY - 1; i++) {
+        history[i] = history[i + 1];
+    }
+
+    // We now have room for one new turn.
+    *history_count = MAX_HISTORY - 1;
+}
+
+// Allocate enough memory for the new user message.
+history[*history_count].user_message =
+    malloc(strlen(user_message) + 1);
+
+// Allocate enough memory for the new assistant response.
+history[*history_count].assistant_response =
+    malloc(strlen(assistant_response) + 1);
+
+// Check that malloc worked.
+if (history[*history_count].user_message == NULL ||
+    history[*history_count].assistant_response == NULL) {
+
+    printf("Memory allocation failed.\n");
+    return;
+}
+
+// Copy the user message into the newly allocated memory.
+strcpy(history[*history_count].user_message, user_message);
+
+// Copy the assistant response into the newly allocated memory.
+strcpy(history[*history_count].assistant_response,
+       assistant_response);
+
+// Increase the number of stored turns.
+(*history_count)++;
+
+}
+
+int main() {
+
+// Store the current user input.
 char input[256];
 
+// Store the current assistant response.
+char response[256];
+
+// Array that can hold up to 5 conversation turns.
+struct ConversationTurn history[MAX_HISTORY];
+
+// Keep track of how many turns are currently stored.
+int history_count = 0;
+
+// Used later for loops.
+int i;
+
+// Keep running until the user types "exit".
 while (1) {
+
+    // Ask the user for input.
     printf("You: ");
 
-    if (fgets(input, sizeof(input), stdin) == NULL) {
-        break;
-    }
+    // Read the user's input.
+    fgets(input, sizeof(input), stdin);
 
+    // Remove the newline character added by fgets().
     input[strcspn(input, "\n")] = '\0';
 
+    // End the program if the user types "exit".
     if (strcmp(input, "exit") == 0) {
-        printf("Goodbye!\n");
         break;
     }
 
-    printf("Mock model received: %s\n", input);
+    // Send the input to our mock model.
+    mock_model(input, response);
+
+    // Print the assistant's response.
+    printf("Assistant: %s\n", response);
+
+    // Save both messages as one conversation turn.
+    add_to_history(history, &history_count, input, response);
 }
+
+// Display the conversation history before exiting.
+printf("\nLast %d conversation turns:\n", history_count);
+
+for (i = 0; i < history_count; i++) {
+    printf("\nTurn %d\n", i + 1);
+    printf("You: %s\n", history[i].user_message);
+    printf("Assistant: %s\n", history[i].assistant_response);
+}
+
+// Free all dynamically allocated memory before the program ends.
+for (i = 0; i < history_count; i++) {
+    free(history[i].user_message);
+    free(history[i].assistant_response);
+}
+
+printf("\nGoodbye!\n");
 
 return 0;
 
 }
 
-Testing:
+The new struct
 
-I compiled the program with:
+This is the main addition:
 
-gcc harness.c -o harness
+struct ConversationTurn {
+char *user_message;
+char *assistant_response;
+};
 
-I ran it with:
+A struct lets us group related information together. Each conversation turn contains a user message and an assistant response.
 
-./harness
+The history array
 
-I tested normal text and the exit command. The program accepted terminal input and ended correctly when I entered exit.
+Inside main() we create:
 
-Step 3 - Mock Model
+struct ConversationTurn history[MAX_HISTORY];
 
-Prompt:
+Since MAX_HISTORY is 5, the array has space for five conversation turns.
 
-Add a separate mock_model() function to the program. The main loop should pass normal user input to this function. If the input contains the word "hello", return a hardcoded greeting. Otherwise, return a simple response containing the user's original message. Store the result in a response array so it can later be saved in conversation history.
+Why we use malloc()
 
-AI Response:
+Instead of giving every message a fixed-size array, each struct contains pointers. We allocate enough memory for each string using:
 
-The AI changed the mock model so it filled a response buffer instead of printing directly. The generated function was:
+malloc(strlen(user_message) + 1);
 
-void mock_model(char input[], char response[]) {
-if (strstr(input, "hello") != NULL) {
-strcpy(response, "Hello! How can I help you?");
+The extra byte is for the terminating \0.
+
+Why history_count uses a pointer
+
+The function receives an int *history_count, and main() passes &history_count, so add_to_history() can update the real count.
+
+What happens after 5 messages?
+
+When the history is full, the oldest strings are freed, the remaining turns shift left, and the newest turn is stored at the end.
+
+Why free() is important
+
+Any memory created with malloc() should eventually be released using free().
+
+Development Result
+
+The program now stores the latest five user/assistant pairs using a struct and dynamic memory.
+
+Interaction 4 - Adding the history Command
+
+User Prompt
+
+Can you add a history command now so when I type history, the program prints the conversation turns that are currently stored? I only want it to show the last 5 turns, and I do not want the word history itself saved as a conversation turn. Keep the code simple and explain what you added.
+
+AI Response
+
+Yes. The simplest way is to check for "history" in main() before sending the input to mock_model() or saving it.
+
+The main new logic is:
+
+if (strcmp(input, "history") == 0) {
+print_history(history, history_count);
+continue;
+}
+
+The continue; is especially important. It tells the program to immediately go back to the top of the while loop, so "history" never reaches mock_model() and never reaches add_to_history().
+
+A separate print_history() function loops through the currently stored conversation turns and prints them.
+
+Example behavior:
+
+You: hello
+Assistant: Hello! Nice to meet you!
+
+You: how are you
+Assistant: how are you
+
+You: history
+
+Conversation History:
+
+Turn 1
+You: hello
+Assistant: Hello! Nice to meet you!
+
+Turn 2
+You: how are you
+Assistant: how are you
+
+Typing history multiple times does not cause the word history itself to appear in the stored conversation history.
+
+Development Result
+
+The program gained a special command for displaying state without changing that state.
+
+Interaction 5 - Reviewing Dynamic Memory Cleanup
+
+User Prompt
+
+Since the conversation history uses malloc, can you make sure the program frees memory correctly? If the history already has 5 turns and a new one is added, free the oldest turn before replacing it. Also free all remaining conversation memory before the program exits. Keep it simple and explain where and why free() is used.
+
+AI Response
+
+Yes. Your program should use free() in two places: when the 5-turn history is full and the oldest turn is removed, and when the program exits.
+
+The first important location is:
+
+free(history[0].user_message);
+free(history[0].assistant_response);
+
+These calls release the dynamically allocated strings belonging to the oldest turn before the history entries are shifted.
+
+The second important location is at program shutdown:
+
+for (i = 0; i < history_count; i++) {
+free(history[i].user_message);
+free(history[i].assistant_response);
+}
+
+This releases all strings that remain in the history when the program ends.
+
+A useful rule is:
+
+malloc() = reserve memory
+free()   = release that memory
+
+The revised version also uses temporary pointers when allocating the new strings. If either malloc() fails, any allocation that did succeed is freed before returning.
+
+Development Result
+
+The memory ownership rules were clarified and cleanup was verified for both history rollover and program termination.
+
+Interaction 6 - Adding Calculator Tool Execution
+
+User Prompt
+
+Now I need to add the tool execution part of the project. Can you add a simple calculator command where I type something like calc 10 + 5? Support +, -, *, and /. Calculator requests should go to the calculator instead of mock_model(), and it should handle division by zero. Keep the code simple and explain what you added.
+
+AI Response
+
+Yes. We can add a separate calculator() function. The main loop checks whether the input starts with "calc ". If it does, it sends the expression to the calculator instead of mock_model().
+
+The calculator reads input with:
+
+sscanf(input + 5, "%lf %c %lf",
+&number1, &operator, &number2);
+
+The input + 5 skips the characters in "calc ".
+
+The routing logic in main() is:
+
+if (strncmp(input, "calc ", 5) == 0) {
+calculator(input, response);
 }
 else {
-snprintf(response, RESPONSE_SIZE, "You said: %s", input);
-}
-}
-
-The main loop was also changed so normal user input was passed to mock_model() and the returned response was printed.
-
-Testing:
-
-I tested hello, normal text, and exit. The program returned the hardcoded greeting when hello was present and returned a simple simulated response for other normal input.
-
-Step 4 - Five-Turn Conversation History
-
-Prompt:
-
-Add context management to the current harness. The program needs to safely store the five most recent conversation turns. Each turn should contain both the user's message and the assistant's response. Use a struct for one turn and use dynamic memory to store copies of the strings. When a sixth turn is added, free the oldest turn, shift the remaining turns, and save the newest turn. Add a "history" command so I can verify what is stored. Free all remaining allocated memory before the program exits.
-
-AI Response:
-
-The AI introduced a Turn structure and a maximum history size of five:
-
-typedef struct {
-char *user;
-char *assistant;
-} Turn;
-
-#define MAX_TURNS 5
-
-It also generated a copy_string() helper using malloc(), a save_turn() function, a show_history() function, and a free_history() function.
-
-The string-copy helper was:
-
-char *copy_string(const char *source) {
-char *copy = malloc(strlen(source) + 1);
-
-if (copy != NULL) {
-    strcpy(copy, source);
+mock_model(input, response);
 }
 
-return copy;
+The calculator supports the four operators:
 
+
+
+
+
+
+
+/
+
+For division, it checks whether the second number is zero before performing the calculation:
+
+if (number2 == 0) {
+strcpy(response, "Error: cannot divide by zero.");
 }
 
-The cleanup function was:
+Example behavior:
 
-void free_history(Turn history[], int count) {
-for (int i = 0; i < count; i++) {
-free(history[i].user);
-free(history[i].assistant);
-}
-}
+You: calc 10 + 5
+Assistant: 15
 
-When the history was already full, save_turn() freed the oldest user and assistant strings, shifted the remaining turns left, and stored the new turn at the end.
+You: calc 20 - 8
+Assistant: 12
 
-Testing:
+You: calc 6 * 4
+Assistant: 24
 
-I entered more than five normal messages and then entered history. The program correctly removed the oldest message and displayed only the five most recent conversation turns.
+You: calc 10 / 2
+Assistant: 5
 
-Step 5 - Calculator Tool
+You: calc 10 / 0
+Assistant: Error: cannot divide by zero.
 
-Prompt:
+Calculator requests are stored as normal conversation turns, but the calculator is used instead of mock_model() to produce their responses.
 
-Add tool execution to the current harness by creating a calculator_tool() function. Calculator requests should use the format "calc number operator number", such as "calc 10 + 5". Support addition, subtraction, multiplication, and division. Use sscanf() to parse the request, detect division by zero, detect unsupported operators, and store the result in the same response buffer used by the mock model. Calculator requests should go to the tool instead of mock_model().
+Development Result
 
-AI Response:
+The tool-execution requirement was implemented by routing calc requests to a dedicated calculator function.
 
-The AI added calculator_tool(), which used sscanf() to parse two numbers and an operator. The generated function was:
+Interaction 7 - Full harness.c Review
 
-int calculator_tool(char input[], char response[]) {
-double num1;
-double num2;
-char operation;
+User Prompt
 
-if (sscanf(input, "calc %lf %c %lf", &num1, &operation, &num2) != 3) {
-    return 0;
-}
+Can you review the full harness.c now and make sure everything works together correctly? It should have the input loop, mock_model(), last 5 conversation turns, history command, dynamic memory cleanup, calculator tool, and exit. Tell me what I should manually test before I make the automated test script.
 
-double result;
+AI Response
 
-switch (operation) {
-    case '+':
-        result = num1 + num2;
-        break;
-    case '-':
-        result = num1 - num2;
-        break;
-    case '*':
-        result = num1 * num2;
-        break;
-    case '/':
-        if (num2 == 0) {
-            strcpy(response, "Error: Cannot divide by zero.");
-            return 1;
-        }
-        result = num1 / num2;
-        break;
-    default:
-        strcpy(response, "Error: Unsupported operator.");
-        return 1;
-}
+The full program was reviewed for:
 
-snprintf(response, RESPONSE_SIZE, "Calculator result: %.2f", result);
-return 1;
+the input loop,
 
-}
+normal mock_model() routing,
 
-The main loop was updated so input beginning with "calc " was routed to calculator_tool() and other normal input was routed to mock_model().
+calculator routing,
 
-Testing:
+history,
 
-I tested addition, subtraction, multiplication, division, and division by zero. For example, calc 10 + 5 returned Calculator result: 15.00 and calc 10 / 0 returned the division-by-zero error. I also checked history afterward and confirmed that calculator requests and responses were stored as conversation turns.
+the five-turn history limit,
 
-Step 6 - Review the Combined Harness
+malloc() / free() behavior,
 
-Prompt:
+and exit.
 
-Review the current harness architecture. The program now has a terminal input loop, an exit command, mock_model(), five-turn conversation history, dynamic memory allocation, a calculator tool, tool routing, and memory cleanup. Tell me what I should manually test before creating the automated test script.
+The recommended manual tests were:
 
-AI Response:
+hello
 
-The AI recommended testing normal input, the hello response, calculator input, division by zero, history with fewer than five turns, history with more than five turns, exit behavior, and memory cleanup.
+normal echo text
 
-Testing:
+calculator addition
 
-I manually tested each of those paths before moving on to automated testing. The individual sections worked together correctly in the combined harness.
+calculator subtraction
 
-Step 7 - Automated Bash Testing
+calculator multiplication
 
-Prompt:
+calculator division
 
-Create a simple Bash testing script named test.sh for my C harness. The script should compile harness.c, test the hello response, test the calculator tool, test division by zero, send more than five conversation turns and verify that only the newest five remain, test the exit command, and print PASS or FAIL for each test. Keep the script simple enough for me to understand.
+division by zero
 
-AI Response:
+unsupported calculator operator
 
-The AI generated test.sh to compile harness.c and pipe predefined input into the program using printf. It used grep to check the output and printed PASS or FAIL for each test. The script included tests for compilation, hello, calculator functionality, division by zero, five-turn history, and exit behavior.
+malformed calculator input
 
-Testing:
+empty history
 
-I ran:
+normal history storage
+
+verifying history is not saved
+
+sending six messages and verifying only messages 2 through 6 remain
+
+verifying calculator requests are stored
+
+exit
+
+verifying exit is not saved
+
+The review also confirmed that the oldest user and assistant strings are freed before a full history is shifted and that all remaining conversation memory is freed after the loop.
+
+Development Result
+
+The completed harness architecture was manually reviewed before automated testing was created.
+
+Interaction 8 - Creating test.sh
+
+User Prompt
+
+Now create a separate Bash testing script named test.sh for my harness. It should compile harness.c and automatically test the hello response, calculator, division by zero, the 5-turn conversation history, and the exit command. For the history test, send 6 messages and verify that only the newest 5 remain. Print PASS or FAIL for each test and keep the script simple enough for me to understand.
+
+AI Response
+
+A separate test.sh file was created.
+
+The script:
+
+compiles harness.c,
+
+tests the hello response,
+
+tests the calculator,
+
+tests division by zero,
+
+sends six messages and checks that only the newest five remain,
+
+tests the exit command,
+
+and prints PASS or FAIL for each test.
+
+The history test stores the output from:
+
+printf "message1\nmessage2\nmessage3\nmessage4\nmessage5\nmessage6\nhistory\nexit\n" | ./harness
+
+It then verifies that message1 is absent from the displayed history and message2 through message6 are present.
+
+The script can be run with:
 
 bash test.sh
 
-The functional tests produced:
+Development Result
 
-PASS: Program compiled.
-PASS: Hello test
-PASS: Calculator test
-PASS: Division by zero test
-PASS: History keeps last 5 turns
-PASS: Exit test
+Automated deterministic functional testing was added in a separate Bash script.
 
-Step 8 - Memory Leak Testing
+Interaction 9 - Adding Basic Memory-Leak Testing
 
-Prompt:
+User Prompt
 
-My conversation history uses malloc() and free(). I am using macOS. Show me a simple way to check the compiled program for basic memory leaks.
+Add one more test to test.sh for basic memory leaks. I am using macOS, so use the leaks tool if it is available, and use valgrind as a fallback if it is installed. During the memory test, send more than 5 conversation messages so it also tests freeing the oldest history entries. Print PASS, FAIL, or SKIP for the memory test and keep the code simple.
 
-AI Response:
+AI Response
 
-The AI recommended using the macOS leaks utility with this command:
+The testing script was updated with a sixth test.
 
-printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness
+The memory test sends more than five conversation messages:
 
-Testing:
+memory_input="one
+two
+three
+four
+five
+six
+exit
+"
 
-I ran the command and the leaks report showed:
+It first checks whether the macOS leaks tool is available:
+
+if command -v leaks >/dev/null 2>&1; then
+
+If available, it runs:
+
+printf "%s" "$memory_input" | leaks --atExit -- ./harness
+
+and checks for:
 
 0 leaks for 0 total leaked bytes
 
-This confirmed that the dynamically allocated conversation memory was being released during the test.
+If leaks is unavailable, the script checks for valgrind and looks for:
 
-Step 9 - Add Memory Testing to test.sh
+definitely lost: 0 bytes
 
-Prompt:
+If neither tool is available, it prints:
 
-Add a basic memory-leak check to test.sh so the automated script also checks memory management. If the macOS leaks tool is available, use it. If leaks is not available but valgrind is available, use valgrind. Print PASS when no leaks are detected and keep this as a separate test.
+SKIP: Memory leaks (leaks/valgrind not installed)
 
-AI Response:
+Development Result
 
-The AI generated this additional test:
+The automated test suite now checks both functional behavior and basic dynamic-memory cleanup.
 
-if command -v leaks >/dev/null 2>&1; then
-output=$(printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness 2>&1)
+Interaction 10 - First Automated-Test Debugging Iteration
 
-if echo "$output" | grep -q "0 leaks for 0 total leaked bytes"; then
-    echo "PASS: Memory leak test"
-else
-    echo "FAIL: Memory leak test"
-fi
+User Input
 
-elif command -v valgrind >/dev/null 2>&1; then
-output=$(printf "hello\ncalc 5 + 5\nexit\n" | valgrind --leak-check=full ./harness 2>&1)
+The user provided a screenshot after running:
 
-if echo "$output" | grep -q "no leaks are possible"; then
-    echo "PASS: Memory leak test"
-elif echo "$output" | grep -q "All heap blocks were freed"; then
-    echo "PASS: Memory leak test"
-else
-    echo "FAIL: Memory leak test"
-fi
+bash test.sh
 
-else
-echo "SKIP: No memory leak checker installed"
-fi
+The screenshot showed:
 
-Testing:
-
-I added this section to the existing test.sh file and ran the script again. On my Mac, the final test script produced:
-
-PASS: Program compiled.
-PASS: Hello test
-PASS: Calculator test
-PASS: Division by zero test
-PASS: History keeps last 5 turns
-PASS: Exit test
-PASS: Memory leak test
-
+PASS: Compile
+FAIL: Hello response
+FAIL: Calculator
+FAIL: Division by zero
+FAIL: 5-turn history
+PASS: Exit command
 Testing complete.
 
-Step 10 - Final Cleanup
+AI Response
 
-Prompt:
+The AI identified that test.sh was running, because compilation and exit passed, but the expected strings in the script did not match the current output of harness.c.
 
-Review the final project files and check whether the implementation matches the project requirements for standard C, POSIX compilation, the terminal core loop, mock model, five-turn context management, safe dynamic memory handling, tool execution, automated testing, memory-leak testing, README documentation, and the vibe coding log. Identify anything that should be cleaned up before submission.
+The AI recommended checking the actual output of:
 
-AI Response:
+hello
+calc 10 + 5
+calc 10 / 0
+message1
+message2
+message3
+message4
+message5
+message6
+history
+exit
 
-The AI reviewed the final project and confirmed that the main implementation requirements were present. It recommended using main(void), making sure harness.c ended with a newline, updating README.md so it matched the final memory test, and keeping unnecessary generated files such as the compiled harness executable and .vscode folder out of the repository.
+It also noticed that the displayed copy of test.sh did not yet contain the memory test.
 
-Testing:
+Development Result
 
-I made the final cleanup changes and ran bash test.sh again. All functional tests and the memory-leak test passed.
+The failure was treated as a test-expectation mismatch rather than immediately changing the program.
 
-Final Requirement Check
+Interaction 11 - Uploading Current harness.c and test.sh for Comparison
 
-Core Loop:
+User Input
 
-The final harness reads a line from the terminal using fgets(), checks for exit, routes normal input to mock_model(), and prints the simulated response.
+The user uploaded the current harness.c and test.sh.
 
-Context Management:
+AI Response
 
-The final harness stores the five most recent user/assistant turns using dynamically allocated memory. When the history is full, the oldest turn is freed before the newest turn is added. All remaining allocated conversation memory is freed before program exit.
+The AI compared the two files and found the exact mismatch.
 
-Tool Execution:
+The current harness produced:
 
-The final harness routes input beginning with "calc " to calculator_tool(). The tool supports addition, subtraction, multiplication, and division and detects division by zero.
+Hello! Nice to meet you!
+Assistant: 15
+Error: cannot divide by zero.
+Conversation History:
 
-Vibe Coding / SDD:
+but the older test script was checking for different strings, including:
 
-The architectural rules, state-machine behavior, hard constraints, and required input/output behavior were defined before the final program was completed. The implementation was then developed and tested section by section.
+Hello! How can I help you?
+Calculator result: 15.00
+Error: Cannot divide by zero.
+--- Conversation History ---
 
-AI-Generated Testing:
+The AI updated the test script to match the actual harness output and included the memory test.
 
-The project includes a separate test.sh script generated with AI assistance. It compiles harness.c, tests mock-model behavior, calculator behavior, division by zero, five-turn state management, exit behavior, and basic memory leaks.
+The corrected script was tested against the uploaded harness and produced:
 
-Final Result
+PASS: Compile
+PASS: Hello response
+PASS: Calculator
+PASS: Division by zero
+PASS: 5-turn history
+PASS: Exit command
+SKIP: Memory leaks (leaks/valgrind not installed)
+Testing complete.
 
-The completed project includes:
+The SKIP occurred only because the AI's execution environment did not contain leaks or valgrind.
 
-harness.c
-test.sh
-README.md
-vibe_coding_log.md
-github.txt
+Development Result
 
-The project implements a standard C terminal harness with a mock model, five-turn conversation context, calculator tool execution, dynamic memory management, automated testing, and memory-leak verification.
+The automated test suite was aligned with the final program's exact output format.
+
+Interaction 12 - Corrected test.sh Still Not Replaced Locally
+
+User Prompt / Input
+
+The user provided a screenshot showing that the local test.sh still ended near line 78 and produced the older failures.
+
+AI Response
+
+The AI determined that the corrected test.sh had not replaced the older local file yet.
+
+It explained that the corrected script should contain checks for:
+
+Hello! Nice to meet you!
+Assistant: 15
+Error: cannot divide by zero.
+Conversation History:
+
+and should also include the memory test.
+
+The AI instructed the user to replace the old test.sh, save it, and run:
+
+bash test.sh
+
+again.
+
+Development Result
+
+The issue was identified as a local-file version mismatch rather than a C-code problem.
+
+Interaction 13 - Final Test Run
+
+User Input
+
+The user provided a screenshot of the corrected script and final terminal output.
+
+The terminal showed:
+
+PASS: Compile
+PASS: Hello response
+PASS: Calculator
+PASS: Division by zero
+PASS: 5-turn history
+PASS: Exit command
+PASS: Memory leaks
+Testing complete.
+
+AI Response
+
+The AI confirmed that the final result was correct and that all functional tests and the memory-leak test passed.
+
+It also noted that the memory test used more than five messages, so the passing result exercised the code path that frees the oldest conversation-history entries.
+
+Development Result
+
+Final verification passed successfully.
+
+Final Architecture Summary
+
+The final harness.c contains the following major components:
+
+struct ConversationTurn
+
+Stores one conversation turn with:
+
+a dynamically allocated user message,
+
+a dynamically allocated assistant response.
+
+mock_model()
+
+Handles normal conversation:
+
+returns a hardcoded greeting when the input contains hello,
+
+otherwise echoes the user's message.
+
+calculator()
+
+Handles tool execution for inputs beginning with:
+
+calc
+
+Supported operations:
+
+addition,
+
+subtraction,
+
+multiplication,
+
+division.
+
+It also handles division by zero.
+
+Conversation History
+
+The program stores at most five turns.
+
+When a sixth turn arrives:
+
+memory for the oldest user message is freed,
+
+memory for the oldest assistant response is freed,
+
+the remaining four turns shift left,
+
+the new turn is stored at the end.
+
+history Command
+
+The history command prints the currently stored turns.
+
+Because continue is used immediately afterward, the command itself is not passed to the mock model or stored in history.
+
+exit Command
+
+Typing:
+
+exit
+
+breaks the input loop.
+
+All remaining dynamically allocated history strings are freed before the program terminates.
+
+Final Automated Testing Summary
+
+The final test.sh automatically verifies:
+
+successful compilation,
+
+hello response,
+
+calculator operation,
+
+division-by-zero handling,
+
+five-turn state management,
+
+exit behavior,
+
+basic memory-leak behavior.
+
+The history test sends six messages and verifies that only messages 2 through 6 remain.
+
+The memory test also sends six messages so that the history-overflow cleanup code executes.
+
+On macOS, leaks is preferred. If it is unavailable, valgrind is used as a fallback. If neither tool exists, the memory test reports SKIP.
+
+Final Verification Output
+
+PASS: Compile
+PASS: Hello response
+PASS: Calculator
+PASS: Division by zero
+PASS: 5-turn history
+PASS: Exit command
+PASS: Memory leaks
+Testing complete.
+
+This final output confirms that the harness compiled, behaved correctly, maintained its context boundary, executed the calculator tool, exited safely, and did not report basic memory leaks during the tested path.
