@@ -8,6 +8,44 @@ Project Development
 
 For this project, I used ChatGPT as an AI coding assistant and followed a Specification Driven Development approach. I first defined the architectural rules and technical requirements for the harness before asking the AI to generate code. I then built the project one section at a time. After each major section was generated, I added it to the version I already had in VS Code, compiled the program, tested the new feature, and then continued to the next requirement.
 
+Architectural Rules
+
+The program must be written in standard C and compile with gcc in a POSIX environment.
+
+The program must use a terminal-based loop and fgets() for user input.
+
+Typing "exit" must safely stop the program.
+
+Normal input must be passed to a mock_model() function that simulates an LLM without using a real LLM API.
+
+The harness must store the five most recent conversation turns.
+
+Each conversation turn must contain both the user message and assistant response.
+
+Conversation memory must be allocated and freed safely.
+
+Calculator requests must be routed to a separate tool instead of the mock model.
+
+The calculator tool must support basic mathematical operations and division-by-zero handling.
+
+A separate Bash testing script must verify state management and basic memory leaks.
+
+State Machine
+
+Start program
+Initialize conversation history
+Read user input with fgets()
+If input is "exit", stop the loop
+If input is "history", display stored conversation history
+If input begins with "calc ", send it to calculator_tool()
+Otherwise, send input to mock_model()
+Print the response
+Save the user message and assistant response
+If more than five turns are stored, remove the oldest turn
+Repeat
+Free remaining allocated memory
+End program
+
 Step 1 - Initial Specification and Architecture
 
 Prompt:
@@ -316,6 +354,36 @@ Testing:
 
 I made the final cleanup changes and ran bash test.sh again. All functional tests and the memory-leak test passed.
 
+Final Requirement Check
+
+Core Loop:
+
+The final harness reads a line from the terminal using fgets(), checks for exit, routes normal input to mock_model(), and prints the simulated response.
+
+Context Management:
+
+The final harness stores the five most recent user/assistant turns using dynamically allocated memory. When the history is full, the oldest turn is freed before the newest turn is added. All remaining allocated conversation memory is freed before program exit.
+
+Tool Execution:
+
+The final harness routes input beginning with "calc " to calculator_tool(). The tool supports addition, subtraction, multiplication, and division and detects division by zero.
+
+Vibe Coding / SDD:
+
+The architectural rules, state-machine behavior, hard constraints, and required input/output behavior were defined before the final program was completed. The implementation was then developed and tested section by section.
+
+AI-Generated Testing:
+
+The project includes a separate test.sh script generated with AI assistance. It compiles harness.c, tests mock-model behavior, calculator behavior, division by zero, five-turn state management, exit behavior, and basic memory leaks.
+
 Final Result
 
-The completed project includes a standard C terminal harness, a mock model, five-turn conversation context, calculator tool execution, dynamic memory allocation and cleanup, automated functional testing, automated memory-leak checking, a README, a vibe-coding development log, and a GitHub submission link. I followed the SDD process by defining the architectural requirements first, requesting each major section separately, integrating each section with the existing code, and verifying the program after each major change.
+The completed project includes:
+
+harness.c
+test.sh
+README.md
+vibe_coding_log.md
+github.txt
+
+The project implements a standard C terminal harness with a mock model, five-turn conversation context, calculator tool execution, dynamic memory management, automated testing, and memory-leak verification.
