@@ -79,5 +79,33 @@ else
     echo "FAIL: Exit test"
 fi
 
+# -------------------------
+# Test 6: Memory leaks
+# -------------------------
+
+if command -v leaks >/dev/null 2>&1; then
+    output=$(printf "hello\ncalc 5 + 5\nexit\n" | leaks --atExit -- ./harness 2>&1)
+
+    if echo "$output" | grep -q "0 leaks for 0 total leaked bytes"; then
+        echo "PASS: Memory leak test"
+    else
+        echo "FAIL: Memory leak test"
+    fi
+
+elif command -v valgrind >/dev/null 2>&1; then
+    output=$(printf "hello\ncalc 5 + 5\nexit\n" | valgrind --leak-check=full ./harness 2>&1)
+
+    if echo "$output" | grep -q "no leaks are possible"; then
+        echo "PASS: Memory leak test"
+    elif echo "$output" | grep -q "All heap blocks were freed"; then
+        echo "PASS: Memory leak test"
+    else
+        echo "FAIL: Memory leak test"
+    fi
+
+else
+    echo "SKIP: No memory leak checker installed"
+fi
+
 echo
 echo "Testing complete."
