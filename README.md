@@ -6,64 +6,196 @@ Fall 2026
 
 Project Description
 
-For this project, I created a simple LLM agent harness using C. The program takes input from the user through the terminal and decides whether the input should be handled by a mock language model or by a calculator tool. The program also stores the five most recent conversation turns, with each turn containing the user's input and the response produced by the program. The project does not use an actual LLM API or any external libraries.
+This project implements a simple LLM-style agent harness in standard C. The program reads user input from the terminal and decides whether the request should be handled by a mock language model or by a calculator tool.
 
-Program Features
+The harness also stores the five most recent conversation turns. Each turn contains the user's message and the assistant response. The program uses dynamic memory for the stored messages and frees that memory when old history is removed and before the program exits.
 
-The program reads user input using fgets(), uses a mock_model() function to simulate an LLM, gives a hardcoded response when the input contains "hello", and echoes other normal input. It also includes a calculator tool that supports addition, subtraction, multiplication, and division. The program detects division by zero, stores the five most recent conversation turns, includes a history command, uses dynamic memory allocation, frees allocated memory before exiting, and includes an automated Bash testing script.
+No real LLM API or external libraries are used.
+
+Features
+
+Terminal input loop using fgets()
+
+exit command for safe shutdown
+
+Separate mock_model() function
+
+Hardcoded greeting when the input contains hello
+
+Echo-style response for other normal input
+
+Five-turn conversation history
+
+history command to display stored turns
+
+Dynamic memory using malloc() and free()
+
+Calculator tool for +, -, *, and /
+
+Division-by-zero handling
+
+Automated Bash testing
+
+Basic memory-leak testing with macOS leaks or valgrind
 
 Project Files
 
-harness.c is the main C program and contains the input loop, mock model, calculator tool, conversation history, and memory management. test.sh is the automated testing script that compiles and tests the program. README.md explains the project and how to compile and run it. vibe_coding_log.md documents the AI-assisted development process used while creating the project.
+harness.c - Main C program
 
-Compiling and Running
+test.sh - Automated test script
 
-The program can be compiled using:
+README.md - Project documentation
+
+vibe_coding_log.md - AI-assisted development log
+
+github.txt - Direct link to the GitHub repository
+
+Compile
+
+Compile the program with:
 
 gcc harness.c -o harness
 
-After compiling, it can be run using:
+Run
+
+Run the program with:
 
 ./harness
 
-Using the Program
+Program Usage
 
-The program continues asking for input until the user enters "exit". Entering "history" displays the saved conversation history. Calculator commands begin with "calc" followed by a number, operator, and another number. For example:
+Normal Input
 
-calc 10 + 5
+Normal input is sent to mock_model().
 
-The program responds with:
+Example:
 
-Assistant: Calculator result: 15.00
+You: how are you
+Assistant: how are you
 
-The calculator supports +, -, *, and /. The program also checks for division by zero and displays an error message instead of performing the calculation.
+Hello Response
 
-Mock Model
+If the input contains the word hello, the mock model returns a hardcoded greeting.
 
-Normal input is sent to the mock_model() function. If the input contains the word "hello", the program responds with "Assistant: Hello! How can I help you?" For other normal input, the program returns a simple response containing the user's message.
+Example:
+
+You: hello
+Assistant: Hello! Nice to meet you!
+
+The hello check is case-sensitive.
+
+Calculator Tool
+
+Calculator requests use this format:
+
+calc number operator number
+
+Example:
+
+You: calc 10 + 5
+Assistant: 15
+
+Supported operators:
+
++
+-
+*
+/
+
+Division by zero is handled safely:
+
+You: calc 10 / 0
+Assistant: Error: cannot divide by zero.
+
+Invalid calculator input produces an error response instead of being sent to the mock model.
 
 Conversation History
 
-The program stores the five most recent conversation turns. Each turn contains both the user's input and the assistant's response. When the history already contains five turns and another turn is added, the oldest turn is removed and its allocated memory is freed. Entering "history" displays the conversation turns currently stored.
+The harness stores the five most recent conversation turns.
+
+Each turn contains:
+
+the user's message
+
+the assistant response
+
+Enter:
+
+history
+
+to display the currently stored turns.
+
+The history command itself is not stored as a conversation turn.
+
+If a sixth conversation turn is added, the oldest turn is removed and its dynamically allocated memory is freed. The remaining turns are shifted so that only the newest five remain.
 
 Memory Management
 
-Dynamic memory is used to store copies of the user messages and assistant responses. Memory is allocated using malloc() and released using free(). When an old conversation is removed from the history, its memory is freed. Before the program exits, all remaining conversation memory is also freed. I tested the program using the macOS leaks tool, which reported "0 leaks for 0 total leaked bytes."
+Conversation messages are stored using dynamically allocated memory.
+
+The program:
+
+allocates memory for saved user and assistant strings with malloc()
+
+frees the oldest turn when the five-turn history is full
+
+frees all remaining stored messages before the program exits
+
+checks for failed memory allocation before saving a new turn
 
 Automated Testing
 
-The automated tests can be run using:
+Run the automated tests with:
 
 bash test.sh
 
-The testing script checks program compilation, the hello response, calculator functionality, division by zero, the five-turn conversation history, the exit command, and basic memory leaks. On macOS it uses the leaks tool, and if valgrind is available it can use that instead. The completed tests produced the following results:
+The script checks:
 
-PASS: Program compiled.
-PASS: Hello test
-PASS: Calculator test
-PASS: Division by zero test
-PASS: History keeps last 5 turns
-PASS: Exit test
-PASS: Memory leak test
+successful compilation
 
-All automated tests passed successfully.
+hello response
+
+calculator functionality
+
+division-by-zero handling
+
+five-turn conversation history
+
+exit behavior
+
+basic memory leaks
+
+The history test sends six messages and verifies that the oldest message is removed while the newest five remain.
+
+The memory test also sends more than five messages so that the history-overflow cleanup path is exercised.
+
+On macOS, the script uses the leaks utility when available. If leaks is unavailable, it uses valgrind when installed.
+
+A successful test run on macOS produces:
+
+PASS: Compile
+PASS: Hello response
+PASS: Calculator
+PASS: Division by zero
+PASS: 5-turn history
+PASS: Exit command
+PASS: Memory leaks
+Testing complete.
+
+Final Implementation
+
+The final project satisfies the main Project 1 requirements by providing:
+
+a terminal-based core loop
+
+a mock model function
+
+bounded conversation context
+
+safe dynamic memory management
+
+calculator tool execution
+
+AI-assisted automated testing
+
+basic memory-leak verification
