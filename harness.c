@@ -150,7 +150,7 @@ void free_history(Turn history[], int count) {
 }
 
 
-int main() {
+int main(void) {
 
     char input[INPUT_SIZE];
     char response[RESPONSE_SIZE];

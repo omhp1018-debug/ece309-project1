@@ -56,7 +56,7 @@ The automated tests can be run using:
 
 bash test.sh
 
-The testing script checks program compilation, the hello response, calculator functionality, division by zero, the five-turn conversation history, and the exit command. The completed tests produced the following results:
+The testing script checks program compilation, the hello response, calculator functionality, division by zero, the five-turn conversation history, the exit command, and basic memory leaks. On macOS it uses the leaks tool, and if valgrind is available it can use that instead. The completed tests produced the following results:
 
 PASS: Program compiled.
 PASS: Hello test
@@ -64,5 +64,6 @@ PASS: Calculator test
 PASS: Division by zero test
 PASS: History keeps last 5 turns
 PASS: Exit test
+PASS: Memory leak test
 
 All automated tests passed successfully.
